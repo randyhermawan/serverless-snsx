@@ -1,0 +1,24 @@
+{
+  "name": "serverless-param-validate",
+  "version": "0.1.0",
+  "description": "Serverless plugin to validate value given and abort execution if needed",
+  "main": "index.js",
+  "author": "Randy Hermawan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/randyhermawan/serverless-param-validate.git"
+  },
+  "keywords": [
+    "serverless",
+    "param",
+    "validate",
+    "plugin"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/randyhermawan/serverless-param-validate/issues"
+  },
+  "homepage": "https://github.com/randyhermawan/serverless-param-validate#readme",
+  "dependencies": {
+  }
+}
