@@ -1,6 +1,6 @@
 {
   "name": "serverless-param-validate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Serverless plugin to validate value given and abort execution if needed",
   "main": "index.js",
   "author": "Randy Hermawan",

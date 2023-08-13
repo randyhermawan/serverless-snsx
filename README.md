@@ -31,23 +31,24 @@ npm install --save-dev serverless-param-validate
 ```
 custom:
   validate:
-    - cond: '"${self:provider.region}" == "ap-southeast-1"'
-      error: Region must be ap-southeast-1
-    - cond: '"${ssm:/architecture-type, ""}" == "verycool"'
-      error: Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
+    deploy:
+      - cond: '"${self:provider.region}" == "ap-southeast-1"'
+        error: Region must be ap-southeast-1
+      - cond: '"${ssm:/architecture-type, ""}" == "verycool"'
+        error: Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
+    remove:
+      - cond: '"${self:provider.region}" == "ap-southeast-1"'
+        error: Region must be ap-southeast-1
 ```
 
 Will give result such as:
 
 ```
-❯ sls  deploy --verbose --region=ap-southeast-1
+❯ sls deploy --verbose --region=ap-southeast-1
 
-Deploying serverless-plugin-dev to stage dev (ap-southeast-1)
-
-Begin param validation checking...
-
-[PASSED] "ap-southeast-1" == "ap-southeast-1"
-✖ Param validation error ("notcool" == "verycool"): Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
+Start param validation...
+  CONDITION_0 - PASSED - "ap-southeast-1" == "ap-southeast-1"
+✖ Validation error ("" == "verycool"): Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
 ```
 
 ---
