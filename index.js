@@ -12,23 +12,33 @@ class ServerlessPlugin {
     };
   }
 
+  isValidObject(item) {
+    return item && typeof item == "object";
+  }
+
   validateRemove() {
     this.logger.notice("");
     this.logger.notice("Start param validation...");
-    this.logger.notice("");
 
-    let params = this.serverless.service.custom.validate.remove;
+    if (
+      this.serverless.service.custom != null &&
+      this.serverless.service.custom.validate != null &&
+      this.serverless.service.custom.validate.remove != null
+    ) {
+      let params = this.serverless.service.custom.validate.remove;
 
-    if (params.length != 0) {
-      if (!this.isValidObject(params)) {
-        this.logger.error(`validate config object is invalid`);
-        process.exit(1);
+      if (params.length != 0) {
+        if (!this.isValidObject(params)) {
+          this.logger.error(`Validate config object is invalid`);
+          process.exit(1);
+        }
+
+        this.runValidation(params);
       }
-
-      this.runValidation(params);
+    } else {
+      this.greyLog("  No param to validate");
     }
 
-    this.logger.notice("");
     this.logger.notice("Param validation passed, continuing stack removal...");
     this.logger.notice("");
   }
@@ -37,15 +47,23 @@ class ServerlessPlugin {
     this.logger.notice("");
     this.logger.notice("Start param validation...");
 
-    let params = this.serverless.service.custom.validate.deploy;
+    if (
+      this.serverless.service.custom != null &&
+      this.serverless.service.custom.validate != null &&
+      this.serverless.service.custom.validate.deploy != null
+    ) {
+      let params = this.serverless.service.custom.validate.deploy;
 
-    if (params.length != 0) {
-      if (!this.isValidObject(params)) {
-        this.logger.error(`validate config object is invalid`);
-        process.exit(1);
+      if (params.length != 0 || params != null) {
+        if (!this.isValidObject(params)) {
+          this.logger.error(`Validate config object is invalid`);
+          process.exit(1);
+        }
+
+        this.runValidation(params);
       }
-
-      this.runValidation(params);
+    } else {
+      this.greyLog("  No param to validate");
     }
 
     this.logger.notice("Param validation passed, continuing deployment...");
@@ -57,7 +75,7 @@ class ServerlessPlugin {
       if (item.cond) {
         try {
           if (eval(item.cond)) {
-            this.logGrey(`  CONDITION_${index} - PASSED - ${item.cond}`);
+            this.greyLog(`  CONDITION_${index} - PASSED - ${item.cond}`);
           } else {
             this.logger.error(`Validation error (${item.cond}): ${item.error}`);
             this.logger.notice("");
@@ -71,11 +89,7 @@ class ServerlessPlugin {
     });
   }
 
-  isValidObject(item) {
-    return item && typeof item == "object";
-  }
-
-  logGrey(message) {
+  greyLog(message) {
     const greyColorCode = "\x1b[90m";
     const resetColorCode = "\x1b[0m";
 
