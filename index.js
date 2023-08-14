@@ -18,12 +18,15 @@ class ServerlessPlugin {
     this.logger.notice("");
 
     let params = this.serverless.service.custom.validate.remove;
-    if (!this.isValidObject(params)) {
-      this.logger.error(`validate config object is invalid`);
-      process.exit(1);
-    }
 
-    this.runValidation(params);
+    if (params.length != 0) {
+      if (!this.isValidObject(params)) {
+        this.logger.error(`validate config object is invalid`);
+        process.exit(1);
+      }
+
+      this.runValidation(params);
+    }
 
     this.logger.notice("");
     this.logger.notice("Param validation passed, continuing stack removal...");
@@ -35,12 +38,15 @@ class ServerlessPlugin {
     this.logger.notice("Start param validation...");
 
     let params = this.serverless.service.custom.validate.deploy;
-    if (!this.isValidObject(params)) {
-      this.logger.error(`validate config object is invalid`);
-      process.exit(1);
-    }
 
-    this.runValidation(params);
+    if (params.length != 0) {
+      if (!this.isValidObject(params)) {
+        this.logger.error(`validate config object is invalid`);
+        process.exit(1);
+      }
+
+      this.runValidation(params);
+    }
 
     this.logger.notice("Param validation passed, continuing deployment...");
     this.logger.notice("");
