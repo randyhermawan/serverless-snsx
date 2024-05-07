@@ -1,12 +1,12 @@
 {
-  "name": "serverless-param-validate",
-  "version": "0.1.3",
-  "description": "Serverless plugin to validate value given and abort execution if needed",
+  "name": "serverless-snsx",
+  "version": "1.0.0",
+  "description": "Serverless SNSX plugin for independent SNS subscription management",
   "main": "index.js",
   "author": "Randy Hermawan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/randyhermawan/serverless-param-validate.git"
+    "url": "git+https://github.com/randyhermawan/serverless-snsx.git"
   },
   "keywords": [
     "serverless",
@@ -16,9 +16,9 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/randyhermawan/serverless-param-validate/issues"
+    "url": "https://github.com/randyhermawan/serverless-snsx/issues"
   },
-  "homepage": "https://github.com/randyhermawan/serverless-param-validate#readme",
+  "homepage": "https://github.com/randyhermawan/serverless-snsx#readme",
   "dependencies": {
   }
 }
