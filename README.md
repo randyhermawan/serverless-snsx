@@ -18,10 +18,7 @@ Hope you find this useful!
 ## Installing the Plugin
 
 ```
-yarn add -D serverless-snsx
-npm install serverless-snsx --save-dev
-
-yarn remove serverless-snsx
+npm install --save-dev serverless-snsx
 npm uninstall serverless-snsx
 ```
 
