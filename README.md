@@ -41,7 +41,7 @@ events:
       filterPolicy: {SubscriptionAttributes}
 ```
 
-There should be warning related to 'Invalid configuration encountered' of 'unsupported function event' but in our deployment, it is safe to ignore.
+There should be warning related to `Invalid configuration encountered` of `unsupported function event` but in our deployment, it is safe to ignore.
 
 ---
 
