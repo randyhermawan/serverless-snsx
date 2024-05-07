@@ -1,56 +1,48 @@
-# Serverless Param Validate
+# Serverless SNSX
 
-[![Serverless][ico-serverless]][link-serverless]
-[![License][ico-license]][link-license]
-[![NPM][ico-npm]][link-npm]
+Serverless Framework custom events similar to existing SNS events.
+SNSX manages the SNS subscription in realtime (query -> compute -> action) and not from the CloudFormation stacks.
 
-[ico-serverless]: http://public.serverless.com/badges/v3.svg
-[ico-license]: https://img.shields.io/github/license/randyhermawan/serverless-go-build.svg
-[ico-npm]: https://img.shields.io/npm/v/serverless-param-validate.svg
-[link-serverless]: http://www.serverless.com/
-[link-license]: ./LICENSE
-[link-npm]: https://www.npmjs.com/package/serverless-param-validate
+## Background
 
-A simple serverless v1.x plugin to give you a checking & validation capabilities to prevent unwanted execution!
+We create this plugin, to tackle problem happening in our Terraform infra when SNS topics is being updated, it somehow removes our SNS subscription (somehow ..).
 
-This plugin allows a conditional input that will go through `Eval` function and if the result doesn't satisfy the condition, it will exit your serverless deployment to avoid unwanted mistakes.
+Then the serverless stack need to be fully removed first before redeploying it to re-trigger the SNS subscription deployment.
 
-## Disclaimer
+Because CloudFormation doesn't manage the stacks after the deployment if there's no configuration changes (per our knowledge). You need to either remove it first, or made some changes to SNS subscription.
 
-- I'm building this plugin following my needs so i won't update the plugin if i don't need to, but feel free to open a PR if you think this plugin need enhancement.
-- I'm not an expert JS developer, so feel free to open PR if there are some codes that can be optimized.
+In our case, this is very useful when we are in position where removing the stacks isn't possible (VPC deployment, etc)
 
-## Installation
+Hope you find this useful!
+
+## Installing the Plugin
 
 ```
-npm install --save-dev serverless-param-validate
+yarn add -D serverless-snsx
+npm install serverless-snsx --save-dev
+
+yarn remove serverless-snsx
+npm uninstall serverless-snsx
 ```
 
-## Usage
+## Serverless Configuration
+
+There isn't any configuration needed at the top level, you just need to replace `sns` event with `snsx` event at function level.
+
+The configuration should be defined either like the first or the second sample.
 
 ```
-custom:
-  validate:
-    deploy:
-      - cond: '"${self:provider.region}" == "ap-southeast-1"'
-        error: Region must be ap-southeast-1
-      - cond: '"${ssm:/architecture-type, ""}" == "verycool"'
-        error: Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
-    remove:
-      - cond: '"${self:provider.region}" == "ap-southeast-1"'
-        error: Region must be ap-southeast-1
+events:
+  - snsx: {TopicArn}
+
+events:
+  - snsx:
+      arn: {TopicArn}
+      filterPolicy: {SubscriptionAttributes}
 ```
 
-Will give result such as:
-
-```
-❯ sls deploy --verbose --region=ap-southeast-1
-
-Start param validation...
-  CONDITION_0 - PASSED - "ap-southeast-1" == "ap-southeast-1"
-✖ Validation error ("" == "verycool"): Infra type must be very cool. Please change it by fully delete and and redeploy the serverless again
-```
+There should be warning related to 'Invalid configuration encountered' of 'unsupported function event' but in our deployment, it is safe to ignore.
 
 ---
 
-**2023 Randy Hermawan, GK**
+**2024 Randy Hermawan**

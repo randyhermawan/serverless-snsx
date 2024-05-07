@@ -1,100 +1,157 @@
 "use strict";
 
+const AwsReq = require("./lib/awsReq");
+
 class ServerlessPlugin {
   constructor(serverless, options, { log }) {
     this.serverless = serverless;
     this.options = options;
+    this.config = serverless.config.serverless.configurationInput;
     this.logger = log;
 
+    this.awsReq = new AwsReq(serverless, options, log);
+
     this.hooks = {
-      "before:deploy:deploy": this.validateDeploy.bind(this),
-      "before:remove:remove": this.validateRemove.bind(this),
+      "after:deploy:deploy": this._loopEvents.bind(this, this.runDeploy),
+      "before:remove:remove": this._loopEvents.bind(this, this.runRemove),
     };
   }
 
-  isValidObject(item) {
-    return item && typeof item == "object";
-  }
-
-  validateRemove() {
-    this.logger.notice("");
-    this.logger.notice("Start param validation...");
-
-    if (
-      this.serverless.service.custom != null &&
-      this.serverless.service.custom.validate != null &&
-      this.serverless.service.custom.validate.remove != null
-    ) {
-      let params = this.serverless.service.custom.validate.remove;
-
-      if (params.length != 0) {
-        if (!this.isValidObject(params)) {
-          this.logger.error(`Validate config object is invalid`);
-          process.exit(1);
-        }
-
-        this.runValidation(params);
+  _loopEvents = (fn) => {
+    Object.entries(this.serverless.service.functions).forEach(
+      ([fnName, fnDef]) => {
+        (fnDef.events || []).forEach((evt) => {
+          if (evt.snsx) fn.call(this, fnName, fnDef, evt.snsx);
+        });
       }
-    } else {
-      this.greyLog("  No param to validate");
-    }
+    );
+  };
 
-    this.logger.notice("Param validation passed, continuing stack removal...");
-    this.logger.notice("");
-  }
-
-  validateDeploy() {
-    this.logger.notice("");
-    this.logger.notice("Start param validation...");
-
-    if (
-      this.serverless.service.custom != null &&
-      this.serverless.service.custom.validate != null &&
-      this.serverless.service.custom.validate.deploy != null
-    ) {
-      let params = this.serverless.service.custom.validate.deploy;
-
-      if (params.length != 0 || params != null) {
-        if (!this.isValidObject(params)) {
-          this.logger.error(`Validate config object is invalid`);
-          process.exit(1);
-        }
-
-        this.runValidation(params);
-      }
-    } else {
-      this.greyLog("  No param to validate");
-    }
-
-    this.logger.notice("Param validation passed, continuing deployment...");
-    this.logger.notice("");
-  }
-
-  runValidation(params) {
-    params.forEach((item, index) => {
-      if (item.cond) {
-        try {
-          if (eval(item.cond)) {
-            this.greyLog(`  CONDITION_${index} - PASSED - ${item.cond}`);
-          } else {
-            this.logger.error(`Validation error (${item.cond}): ${item.error}`);
-            this.logger.notice("");
-            process.exit(1);
-          }
-        } catch (e) {
-          this.logger.error(`Cannot evaluate condition ${item.cond}: ${e}`);
-          process.exit(1);
-        }
-      }
-    });
-  }
-
-  greyLog(message) {
+  _infoLog = (message) => {
     const greyColorCode = "\x1b[90m";
     const resetColorCode = "\x1b[0m";
 
     this.logger.verbose(`${greyColorCode}${message}${resetColorCode}`);
-  }
+  };
+
+  runDeploy = (fnName, fnDef, topicDef) => {
+    const _self = this;
+
+    _self._check(fnDef, topicDef).then((actData) => {
+      const topicArnSplits = actData.TopicArn.split(":");
+      const topicName = topicArnSplits[topicArnSplits.length - 1];
+
+      switch (actData.Action) {
+        case "create-new-sub":
+          return _self.awsReq.SNSSubscribe(actData).then((res) => {
+            console.log(
+              `[snsx event] function '${fnName}' subscribed to topic '${topicName}' with subscription: ${res.SubscriptionArn}`
+            );
+            _self.awsReq.LambdaSetSNSTrigger(actData).then((res) => {
+              console.log(
+                `[snsx event] function '${fnName}' sns topic '${topicName}' trigger permission added`
+              );
+            });
+          });
+
+        case "update-sub-attr":
+          return _self.awsReq.SNSSetFilter(actData).then((res) => {
+            console.log(
+              `[snsx event] function '${fnName}' subscription to topic '${topicName}' updated`
+            );
+          });
+
+        default:
+          console.log(
+            `[snsx event] function '${fnName}' subscription to topic '${topicName}' already in-sync`
+          );
+          break;
+      }
+    });
+  };
+
+  runRemove = (fnName, fnDef, topicDef) => {
+    const _self = this;
+
+    _self._check(fnDef, topicDef).then((actData) => {
+      const topicArnSplits = actData.TopicArn.split(":");
+      const topicName = topicArnSplits[topicArnSplits.length - 1];
+
+      switch (actData.Action) {
+        case ("update-sub-attr", "none"):
+          return _self.awsReq.SNSUnsubscribe(actData).then((res) => {
+            console.log(
+              `[snsx event] function '${fnName}' unsubscribed from topic '${topicName}'`
+            );
+          });
+
+        default:
+          console.log(
+            `[snsx event] function '${fnName}' subscription to topic '${topicName}' already removed`
+          );
+          break;
+      }
+    });
+  };
+
+  _check = (fnDef, topicDef) => {
+    const _self = this;
+
+    var fnArn, subArn;
+
+    var topicArn = topicDef;
+    if (topicDef.arn) topicArn = topicDef.arn;
+
+    return _self.awsReq
+      .LambdaGetFunction(fnDef.name)
+      .then((resp) => {
+        fnArn = resp.Configuration.FunctionArn;
+        return _self.awsReq.SNSListSubscription(topicArn);
+      })
+      .then((resp) => {
+        const targetSub =
+          resp.Subscriptions.find(
+            (sub) => sub.Protocol === "lambda" && sub.Endpoint === fnArn
+          ) || {};
+        subArn = targetSub.SubscriptionArn;
+
+        if (!targetSub.SubscriptionArn) return { Action: "create-new-sub" };
+        else return _self.awsReq.SNSGetSubscription(targetSub.SubscriptionArn);
+      })
+      .then((resp) => {
+        const res = {
+          FunctionArn: fnArn,
+          TopicArn: topicArn,
+        };
+
+        if (resp.Action === "create-new-sub") {
+          res.Action = "create-new-sub";
+          res.FilterPolicy = topicDef.filterPolicy
+            ? JSON.stringify(topicDef.filterPolicy)
+            : undefined;
+        } else {
+          res.SubscriptionArn = subArn;
+
+          if (
+            topicDef.filterPolicy &&
+            (resp.Attributes.FilterPolicy || "") !==
+              (JSON.stringify(topicDef.filterPolicy) || "")
+          ) {
+            res.Action = "update-sub-attr";
+            res.FilterPolicy = JSON.stringify(topicDef.filterPolicy);
+          } else if (!topicDef.filterPolicy && resp.Attributes.FilterPolicy) {
+            res.Action = "update-sub-attr";
+            res.FilterPolicy = JSON.stringify({});
+          } else res.Action = "none";
+        }
+
+        return res;
+      })
+      .catch(function (error) {
+        _self.logger.error(`Error computing sns actions: ${error}`);
+        process.exit(1);
+      });
+  };
 }
 
 module.exports = ServerlessPlugin;
