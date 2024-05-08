@@ -6,7 +6,6 @@ class ServerlessPlugin {
   constructor(serverless, options, { log }) {
     this.serverless = serverless;
     this.options = options;
-    this.config = serverless.config.serverless.configurationInput;
     this.logger = log;
 
     this.awsReq = new AwsReq(serverless, options, log);
@@ -37,34 +36,51 @@ class ServerlessPlugin {
   runDeploy = (fnName, fnDef, topicDef) => {
     const _self = this;
 
-    _self._check(fnDef, topicDef).then((actData) => {
+    _self._computeDeploy(fnDef, topicDef).then((actData) => {
       const topicArnSplits = actData.TopicArn.split(":");
       const topicName = topicArnSplits[topicArnSplits.length - 1];
 
+      const setPermission = () => {
+        _self.awsReq.LambdaSetSNSTrigger(actData).then((res) => {
+          console.log(
+            `[snsx event] added trigger permission from sns '${topicName}' to function '${fnName}'`
+          );
+        });
+      };
+
       switch (actData.Action) {
+        case "function-not-found":
+          _self.logger.error(
+            `Error while retrieving '${fnDef.name}', function doesn't exist`
+          );
+
+          break;
+
         case "create-new-sub":
-          return _self.awsReq.SNSSubscribe(actData).then((res) => {
+          _self.awsReq.SNSSubscribe(actData).then((res) => {
             console.log(
               `[snsx event] function '${fnName}' subscribed to topic '${topicName}' with subscription: ${res.SubscriptionArn}`
             );
-            _self.awsReq.LambdaSetSNSTrigger(actData).then((res) => {
-              console.log(
-                `[snsx event] function '${fnName}' sns topic '${topicName}' trigger permission added`
-              );
-            });
           });
 
+          if (actData.SetPermission) setPermission();
+          break;
+
         case "update-sub-attr":
-          return _self.awsReq.SNSSetFilter(actData).then((res) => {
+          _self.awsReq.SNSSetFilter(actData).then((res) => {
             console.log(
               `[snsx event] function '${fnName}' subscription to topic '${topicName}' updated`
             );
           });
 
+          if (actData.SetPermission) setPermission();
+          break;
+
         default:
           console.log(
             `[snsx event] function '${fnName}' subscription to topic '${topicName}' already in-sync`
           );
+
           break;
       }
     });
@@ -73,12 +89,12 @@ class ServerlessPlugin {
   runRemove = (fnName, fnDef, topicDef) => {
     const _self = this;
 
-    _self._check(fnDef, topicDef).then((actData) => {
+    _self._computeRemove(fnDef, topicDef).then((actData) => {
       const topicArnSplits = actData.TopicArn.split(":");
       const topicName = topicArnSplits[topicArnSplits.length - 1];
 
       switch (actData.Action) {
-        case ("update-sub-attr", "none"):
+        case "delete-sub":
           return _self.awsReq.SNSUnsubscribe(actData).then((res) => {
             console.log(
               `[snsx event] function '${fnName}' unsubscribed from topic '${topicName}'`
@@ -94,10 +110,12 @@ class ServerlessPlugin {
     });
   };
 
-  _check = (fnDef, topicDef) => {
+  _computeDeploy = (fnDef, topicDef) => {
     const _self = this;
 
-    var fnArn, subArn;
+    var fnArn,
+      subArn,
+      setPermission = false;
 
     var topicArn = topicDef;
     if (topicDef.arn) topicArn = topicDef.arn;
@@ -106,6 +124,33 @@ class ServerlessPlugin {
       .LambdaGetFunction(fnDef.name)
       .then((resp) => {
         fnArn = resp.Configuration.FunctionArn;
+
+        _self.awsReq
+          .LambdaGetPolicy(fnDef.name)
+          .then((res) => {
+            const triggerPermission = JSON.parse(res.Policy).Statement.find(
+              (st) => {
+                return (
+                  st.Principal.Service === "sns.amazonaws.com" &&
+                  st.Resource === fnArn &&
+                  st.Condition.ArnLike["AWS:SourceArn"] === topicArn
+                );
+              }
+            );
+
+            if (!triggerPermission) setPermission = true;
+          })
+          .catch((err) => {
+            if (
+              !err.message.includes("The resource you requested does not exist")
+            ) {
+              _self.logger.error(
+                `Error while running 'getPolicy' for function '${fnName}': ${err}`
+              );
+              process.exit(1);
+            } else setPermission = true;
+          });
+
         return _self.awsReq.SNSListSubscription(topicArn);
       })
       .then((resp) => {
@@ -122,6 +167,7 @@ class ServerlessPlugin {
         const res = {
           FunctionArn: fnArn,
           TopicArn: topicArn,
+          SetPermission: setPermission,
         };
 
         if (resp.Action === "create-new-sub") {
@@ -148,7 +194,42 @@ class ServerlessPlugin {
         return res;
       })
       .catch(function (error) {
-        _self.logger.error(`Error computing sns actions: ${error}`);
+        if (error.message.includes("Function not found:"))
+          return { Action: "function-not-found", TopicArn: topicArn };
+
+        _self.logger.error(`Error computing snsx deployment: ${error}`);
+        process.exit(1);
+      });
+  };
+
+  _computeRemove = (fnDef, topicDef) => {
+    const _self = this;
+
+    var topicArn = topicDef;
+    if (topicDef.arn) topicArn = topicDef.arn;
+
+    const topicArnSplits = topicArn.split(":");
+    const fnArn = `arn:aws:lambda:${_self.options.region}:${topicArnSplits[4]}:function:${fnDef.name}`;
+
+    const res = { FunctionArn: fnArn, TopicArn: topicArn };
+
+    return _self.awsReq
+      .SNSListSubscription(topicArn)
+      .then((resp) => {
+        const targetSub =
+          resp.Subscriptions.find(
+            (sub) => sub.Protocol === "lambda" && sub.Endpoint === fnArn
+          ) || {};
+
+        if (targetSub.SubscriptionArn) {
+          res.Action = "delete-sub";
+          res.SubscriptionArn = targetSub.SubscriptionArn;
+        } else res.Action = "none";
+
+        return res;
+      })
+      .catch(function (error) {
+        _self.logger.error(`Error computing snsx removal: ${error}`);
         process.exit(1);
       });
   };
