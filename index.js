@@ -8,6 +8,14 @@ class ServerlessPlugin {
     this.options = options;
     this.logger = log;
 
+    const debugConfig = this.serverless.service.custom?.snsx?.debug ?? {};
+    this.isDebug = {
+      getLambda: debugConfig.getLambda === true,
+      getLambdaPolicy: debugConfig.getLambdaPolicy === true,
+      getSnsSubscription: debugConfig.getSnsSubscription === true,
+      listSnsSubscription: debugConfig.listSnsSubscription === true,
+    };
+
     this.awsReq = new AwsReq(serverless, options, log);
 
     this.hooks = {
@@ -123,11 +131,17 @@ class ServerlessPlugin {
     return _self.awsReq
       .LambdaGetFunction(fnDef.name)
       .then((resp) => {
+        if (this.isDebug.getLambda)
+          console.log("[snsx debug] GetLambda Res: ", resp);
+
         fnArn = resp.Configuration.FunctionArn;
 
         _self.awsReq
           .LambdaGetPolicy(fnDef.name)
           .then((res) => {
+            if (this.isDebug.getLambdaPolicy)
+              console.log("[snsx debug] GetLambdaPolicy Res: ", res);
+
             const triggerPermission = JSON.parse(res.Policy).Statement.find(
               (st) => {
                 return (
@@ -164,6 +178,9 @@ class ServerlessPlugin {
         else return _self.awsReq.SNSGetSubscription(targetSub.SubscriptionArn);
       })
       .then((resp) => {
+        if (this.isDebug.getSnsSubscription)
+          console.log("[snsx debug] GetSnsSubscription Res: ", resp);
+
         const res = {
           FunctionArn: fnArn,
           TopicArn: topicArn,
@@ -216,6 +233,9 @@ class ServerlessPlugin {
     return _self.awsReq
       .SNSListSubscription(topicArn)
       .then((resp) => {
+        if (this.isDebug.getSnsSubscription)
+          console.log("[snsx debug] ListSnsSubscription Res: ", resp);
+
         const targetSub =
           resp.Subscriptions.find(
             (sub) => sub.Protocol === "lambda" && sub.Endpoint === fnArn
