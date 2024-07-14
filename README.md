@@ -36,9 +36,15 @@ events:
   - snsx:
       arn: {TopicArn}
       filterPolicy: {SubscriptionAttributes}
+
+custom:
+  snsx:
+    bucketName: "snsx-state-bucket-8k37fy"
 ```
 
-There should be warning related to `Invalid configuration encountered` of `unsupported function event` but in our deployment, it is safe to ignore.
+The `custom.snsx.bucketName` is a required parameter to strore the state file. We use a state file to keep track of created sns subscription so we can later remove the subscription when there are configuration changes.
+
+When the configuration is deployed, there will be warning related to `Invalid configuration encountered` of `unsupported function event` but in our deployment, it is safe to ignore.
 
 ---
 
