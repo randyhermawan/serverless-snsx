@@ -58,7 +58,7 @@ class ServerlessPlugin {
   }
 
   Validate = async () => {
-    const bucketName = this.serverless.service.custom?.scalex?.bucketName;
+    const bucketName = this.serverless.service.custom?.snsx?.bucketName;
     if (!bucketName) {
       this.logger.error(
         `Missing required serverless parameter at custom.snsx.bucketName`
