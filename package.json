@@ -10,9 +10,8 @@
   },
   "keywords": [
     "serverless",
-    "param",
-    "validate",
-    "plugin"
+    "sns",
+    "workaround"
   ],
   "license": "MIT",
   "bugs": {

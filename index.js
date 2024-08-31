@@ -13,10 +13,59 @@ class ServerlessPlugin {
     this.deployFn = new DeployFunc(serverless, options, log);
 
     this.hooks = {
+      "before:deploy:deploy": this.Validate.bind(this),
       "after:deploy:deploy": this.Deploy.bind(this),
       "after:remove:remove": this.Destroy.bind(this),
     };
+
+    serverless.configSchemaHandler.defineCustomProperties({
+      type: "object",
+      properties: {
+        snsx: {
+          type: "object",
+          properties: {
+            bucketName: { type: "string" },
+          },
+          required: ["bucketName"],
+        },
+      },
+      required: ["snsx"],
+    });
+
+    serverless.configSchemaHandler.defineFunctionEvent("aws", "snsx", {
+      type: "object",
+      properties: {
+        arn: { type: "string" },
+        topicName: { type: "string" },
+        displayName: { type: "string" },
+        filterPolicy: {
+          type: "object",
+          additionalProperties: true,
+        },
+        region: { type: "string" },
+        rawMessageDelivery: { type: "boolean" },
+        redrivePolicy: {
+          type: "object",
+          properties: {
+            deadLetterTargetArn: { type: "string" },
+          },
+          required: ["deadLetterTargetArn"],
+        },
+      },
+      required: ["arn"],
+      additionalProperties: false,
+    });
   }
+
+  Validate = async () => {
+    const bucketName = this.serverless.service.custom?.scalex?.bucketName;
+    if (!bucketName) {
+      this.logger.error(
+        `Missing required serverless parameter at custom.scalex.bucketName`
+      );
+      process.exit(1);
+    }
+  };
 
   Deploy = async () => {
     this._checkS3Bucket();
