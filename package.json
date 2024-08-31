@@ -1,6 +1,6 @@
 {
   "name": "serverless-snsx",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Serverless SNSX plugin for independent SNS subscription management",
   "main": "index.js",
   "author": "Randy Hermawan",
@@ -18,6 +18,5 @@
     "url": "https://github.com/randyhermawan/serverless-snsx/issues"
   },
   "homepage": "https://github.com/randyhermawan/serverless-snsx#readme",
-  "dependencies": {
-  }
+  "dependencies": {}
 }
