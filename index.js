@@ -61,7 +61,7 @@ class ServerlessPlugin {
     const bucketName = this.serverless.service.custom?.scalex?.bucketName;
     if (!bucketName) {
       this.logger.error(
-        `Missing required serverless parameter at custom.scalex.bucketName`
+        `Missing required serverless parameter at custom.snsx.bucketName`
       );
       process.exit(1);
     }
